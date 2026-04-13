@@ -1,0 +1,42 @@
+[
+  {
+    "id": "Q1",
+    "query": "RAGの精度向上",
+    "query_en": "RAG accuracy improvement",
+    "type": "technical_moderate",
+    "abstraction": "medium",
+    "expected_overlap_effect": "partial"
+  },
+  {
+    "id": "Q2",
+    "query": "コンサルティング案件の失敗パターン",
+    "query_en": "Consulting project failure patterns",
+    "type": "domain_abstract",
+    "abstraction": "high",
+    "expected_overlap_effect": "significant"
+  },
+  {
+    "id": "Q3",
+    "query": "Pythonアーキテクチャの改善",
+    "query_en": "Python architecture improvement",
+    "type": "technical_specific",
+    "abstraction": "low",
+    "expected_overlap_effect": "none"
+  },
+  {
+    "id": "Q4",
+    "query": "セッション蒸留と知識管理",
+    "query_en": "Session distillation and knowledge management",
+    "type": "domain_abstract",
+    "abstraction": "high",
+    "expected_overlap_effect": "critical"
+  },
+  {
+    "id": "Q5",
+    "query": "プレゼンテーション資料の作り方",
+    "query_en": "How to create presentation materials",
+    "type": "mixed_moderate",
+    "abstraction": "medium",
+    "expected_overlap_effect": "significant"
+  }
+]

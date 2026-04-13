@@ -1,0 +1,150 @@
+{
+  "config": {
+    "embedding_model": "intfloat/multilingual-e5-base",
+    "reranker_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "vector_k": 20,
+    "mmr_k": 7,
+    "final_k": 3,
+    "lambda_mult": 0.7
+  },
+  "hardware": "Apple M1, 8GB RAM",
+  "note": "Cold-start latency (first query loads models). Warm latency ~350ms. Document IDs are anonymized (kb_doc_NN) to protect the operational knowledge base.",
+  "summary": {
+    "n_queries": 5,
+    "avg_overlap": 1.8,
+    "avg_changed": 1.2,
+    "overlap_rate": 0.6,
+    "verdict": "Pipeline order has SIGNIFICANT effect (avg 1.2/3 documents changed)"
+  },
+  "per_query": [
+    {
+      "id": "Q1",
+      "query": "RAGの精度向上",
+      "type": "technical_moderate",
+      "overlap": 2,
+      "changed": 1,
+      "mmr_then_rerank": {
+        "results": [
+          {"rank": 1, "file": "kb_doc_01.md", "vector_score": 0.855, "rerank_norm": 0.998},
+          {"rank": 2, "file": "kb_doc_02.md", "vector_score": 0.847, "rerank_norm": 0.995},
+          {"rank": 3, "file": "kb_doc_03.md", "vector_score": 0.861, "rerank_norm": 0.993}
+        ],
+        "latency_ms": {"vector": 9773, "mmr": 1.7, "rerank": 147, "total": 9921}
+      },
+      "rerank_then_mmr": {
+        "results": [
+          {"rank": 1, "file": "kb_doc_03.md", "vector_score": 0.861, "mmr_score": 0.861},
+          {"rank": 2, "file": "kb_doc_01.md", "vector_score": 0.855, "mmr_score": 0.326},
+          {"rank": 3, "file": "kb_doc_04.md", "vector_score": 0.841, "mmr_score": 0.322}
+        ],
+        "latency_ms": {"vector": 245, "rerank": 148, "mmr": 1.7, "total": 524}
+      },
+      "unique_to_mmr_first": ["kb_doc_02.md"],
+      "unique_to_rerank_first": ["kb_doc_04.md"]
+    },
+    {
+      "id": "Q2",
+      "query": "コンサルティング案件の失敗パターン",
+      "type": "domain_abstract",
+      "overlap": 2,
+      "changed": 1,
+      "mmr_then_rerank": {
+        "results": [
+          {"rank": 1, "file": "kb_doc_05.md", "vector_score": 0.847, "rerank_norm": 1.000},
+          {"rank": 2, "file": "kb_doc_06.md", "vector_score": 0.838, "rerank_norm": 1.000},
+          {"rank": 3, "file": "kb_doc_07.md", "vector_score": 0.843, "rerank_norm": 1.000}
+        ],
+        "latency_ms": {"vector": 8, "mmr": 1.4, "rerank": 139, "total": 148}
+      },
+      "rerank_then_mmr": {
+        "results": [
+          {"rank": 1, "file": "kb_doc_08.md", "vector_score": 0.851, "mmr_score": 0.851},
+          {"rank": 2, "file": "kb_doc_07.md", "vector_score": 0.843, "mmr_score": 0.318},
+          {"rank": 3, "file": "kb_doc_05.md", "vector_score": 0.847, "mmr_score": 0.318}
+        ],
+        "latency_ms": {"vector": 9, "rerank": 137, "mmr": 1.7, "total": 271}
+      },
+      "unique_to_mmr_first": ["kb_doc_06.md"],
+      "unique_to_rerank_first": ["kb_doc_08.md"]
+    },
+    {
+      "id": "Q3",
+      "query": "Pythonアーキテクチャの改善",
+      "type": "technical_specific",
+      "overlap": 3,
+      "changed": 0,
+      "mmr_then_rerank": {
+        "results": [
+          {"rank": 1, "file": "kb_doc_09.md", "vector_score": 0.852, "rerank_norm": 1.000},
+          {"rank": 2, "file": "kb_doc_10.md", "vector_score": 0.860, "rerank_norm": 1.000},
+          {"rank": 3, "file": "kb_doc_11.md", "vector_score": 0.857, "rerank_norm": 0.999}
+        ],
+        "latency_ms": {"vector": 8, "mmr": 1.5, "rerank": 134, "total": 144}
+      },
+      "rerank_then_mmr": {
+        "results": [
+          {"rank": 1, "file": "kb_doc_10.md", "vector_score": 0.860, "mmr_score": 0.860},
+          {"rank": 2, "file": "kb_doc_09.md", "vector_score": 0.852, "mmr_score": 0.340},
+          {"rank": 3, "file": "kb_doc_11.md", "vector_score": 0.857, "mmr_score": 0.334}
+        ],
+        "latency_ms": {"vector": 9, "rerank": 137, "mmr": 1.7, "total": 270}
+      },
+      "unique_to_mmr_first": [],
+      "unique_to_rerank_first": [],
+      "note": "Specific technical query: pipeline order has no effect. Same 3 documents retrieved."
+    },
+    {
+      "id": "Q4",
+      "query": "セッション蒸留と知識管理",
+      "type": "domain_abstract",
+      "overlap": 0,
+      "changed": 3,
+      "mmr_then_rerank": {
+        "results": [
+          {"rank": 1, "file": "kb_doc_12.md", "vector_score": 0.843, "rerank_norm": 1.000, "perspective": "methodology"},
+          {"rank": 2, "file": "kb_doc_13.md", "vector_score": 0.842, "rerank_norm": 1.000, "perspective": "tool_failure"},
+          {"rank": 3, "file": "kb_doc_14.md", "vector_score": 0.878, "rerank_norm": 1.000, "perspective": "knowledge_loss"}
+        ],
+        "coverage": ["design_methodology", "tool_failure", "knowledge_loss"],
+        "latency_ms": {"vector": 8, "mmr": 1.6, "rerank": 137, "total": 147}
+      },
+      "rerank_then_mmr": {
+        "results": [
+          {"rank": 1, "file": "kb_doc_15.md", "vector_score": 0.852, "mmr_score": 0.852, "perspective": "process"},
+          {"rank": 2, "file": "kb_doc_16.md", "vector_score": 0.842, "mmr_score": 0.332, "perspective": "process"},
+          {"rank": 3, "file": "kb_doc_17.md", "vector_score": 0.844, "mmr_score": 0.321, "perspective": "process"}
+        ],
+        "coverage": ["process", "process", "process"],
+        "latency_ms": {"vector": 9, "rerank": 137, "mmr": 1.7, "total": 281}
+      },
+      "unique_to_mmr_first": ["kb_doc_12.md", "kb_doc_13.md", "kb_doc_14.md"],
+      "unique_to_rerank_first": ["kb_doc_15.md", "kb_doc_16.md", "kb_doc_17.md"],
+      "note": "Strongest evidence. Abstract consulting query: 0/3 overlap. MMR-first covers 3 distinct perspectives; Rerank-first collapses to process-only."
+    },
+    {
+      "id": "Q5",
+      "query": "プレゼンテーション資料の作り方",
+      "type": "mixed_moderate",
+      "overlap": 2,
+      "changed": 1,
+      "mmr_then_rerank": {
+        "results": [
+          {"rank": 1, "file": "kb_doc_18.md", "vector_score": 0.828, "rerank_norm": 1.000},
+          {"rank": 2, "file": "kb_doc_19.md", "vector_score": 0.832, "rerank_norm": 1.000},
+          {"rank": 3, "file": "kb_doc_20.md", "vector_score": 0.831, "rerank_norm": 1.000}
+        ],
+        "latency_ms": {"vector": 8, "mmr": 1.6, "rerank": 138, "total": 148}
+      },
+      "rerank_then_mmr": {
+        "results": [
+          {"rank": 1, "file": "kb_doc_19.md", "vector_score": 0.832, "mmr_score": 0.832},
+          {"rank": 2, "file": "kb_doc_20.md", "vector_score": 0.831, "mmr_score": 0.317},
+          {"rank": 3, "file": "kb_doc_21.md", "vector_score": 0.821, "mmr_score": 0.310}
+        ],
+        "latency_ms": {"vector": 9, "rerank": 137, "mmr": 1.7, "total": 271}
+      },
+      "unique_to_mmr_first": ["kb_doc_18.md"],
+      "unique_to_rerank_first": ["kb_doc_21.md"]
+    }
+  ]
+}
