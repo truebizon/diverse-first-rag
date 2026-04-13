@@ -285,6 +285,8 @@ For consulting queries, we observe that λ = 0.7 is sufficient to produce the or
 
 **English reranker on Japanese corpus**: We use `cross-encoder/ms-marco-MiniLM-L-6-v2`, an English model, on a Japanese knowledge base. A Japanese CrossEncoder (e.g., `hotchpotch/japanese-reranker-cross-encoder-small-v1`) would likely produce higher-quality reranking scores. The current setup demonstrates that even a mismatched reranker produces meaningful results; a matched reranker would strengthen the findings.
 
+**Model scale**: Experiments used a mid-sized embedding model (multilingual-E5-base, 768d, 110M parameters) and a lightweight reranker (MiniLM-L-6, 22M parameters). The Viewpoint Redundancy mechanism is structural — it arises from pipeline ordering, not from any particular model's characteristics — and is expected to hold at larger scales. Validation with larger embedding models (e.g., multilingual-E5-large-instruct) and stronger rerankers remains future work.
+
 **Single domain**: All experiments use a business consulting knowledge base. Whether the findings generalize to legal, medical, or other knowledge-intensive domains remains to be validated.
 
 ### 6.4 Practical Recommendations
