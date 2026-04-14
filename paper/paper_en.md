@@ -9,7 +9,7 @@
 
 ## Abstract
 
-Retrieval-Augmented Generation (RAG) systems are increasingly deployed in knowledge-intensive domains where queries require multi-perspective answers. Standard pipelines optimize for relevance first — dense retrieval, quality reranking, then optional diversity filtering — but this ordering causes **Viewpoint Redundancy**: the reranker collapses the candidate pool to semantically similar documents before diversity can act.
+Retrieval-Augmented Generation (RAG) systems are increasingly deployed in knowledge-intensive domains where queries require multi-perspective answers. Standard pipelines optimize for relevance first — dense retrieval, quality reranking, then optional diversity filtering — but this ordering causes **Viewpoint Redundancy**: the reranker collapses the candidate pool to semantically similar documents before diversity can act. When domain experts ask abstract, multi-faceted questions, this can produce outputs that appear comprehensive while omitting equally relevant perspectives — a failure mode that is easy to miss precisely because the returned documents remain individually plausible.
 
 We propose **Diversity-First RAG**: placing MMR (Maximal Marginal Relevance) before CrossEncoder reranking, not after. Evaluated on a real business consulting knowledge base (~40 documents, multilingual-E5-base embeddings, ChromaDB), this reordering changes retrieved documents in **40% of queries** (avg. 1.2/3 per query) and produces **0% document overlap** on abstract, multi-faceted consulting queries — the exact queries where viewpoint diversity most affects answer quality.
 
@@ -19,7 +19,23 @@ Critically, MMR adds only **1.7ms** of latency. The diversity benefit is essenti
 
 ## 1. Introduction
 
-### 1.1 The Problem with Standard RAG
+### 1.1 Why Perspective Coverage Matters in Practice
+
+In knowledge-intensive settings, domain experts often pose abstract queries for which no single document is the correct answer — only a diverse set of perspectives yields an adequate response. To illustrate, consider a knowledge worker querying a consulting knowledge base with: *"What patterns have caused AI adoption projects to fail?"* A relevance-first RAG pipeline may return three documents all emphasizing change management, while equally relevant documents on technical debt, leadership misalignment, or training costs are never surfaced. The output appears complete; the omission is invisible. This illustrative scenario reflects a structural property of knowledge bases where embedding similarity correlates with topic rather than perspective, causing relevance-optimized retrieval to cluster within a single viewpoint.
+
+The concern extends to other knowledge-intensive domains (illustrative; not empirically validated in this paper):
+
+| Domain | Typical Query | Perspectives Potentially Missed |
+|--------|--------------|--------------------------------------|
+| Management consulting | "Failure patterns in AI adoption" | Technical debt, leadership, training gaps |
+| Medical decision support | "Differential diagnosis for these symptoms" | Rare conditions, drug interactions |
+| Legal analysis | "Risks in this contract structure" | Regulatory, counterparty, enforcement jurisdiction |
+| R&D search | "Prior art for this mechanism" | Adjacent-field analogues, negative results |
+| HR / people analytics | "Indicators of attrition risk" | Composite risk factors beyond the dominant signal |
+
+In our experiments, pipeline order changes **40% of the final retrieved documents** on average, with complete divergence (0/3 overlap) on the most abstract consulting queries. For organizations that build knowledge bases precisely to preserve diverse experience, this suggests that perspective coverage — not only relevance — is a practical retrieval requirement.
+
+### 1.2 The Problem with Standard RAG
 
 Modern RAG systems follow a well-established pipeline:
 
@@ -35,7 +51,7 @@ This query has no single correct document. Multiple valid perspectives exist: ch
 
 We call this failure mode **Viewpoint Redundancy**.
 
-### 1.2 The Viewpoint Redundancy Problem
+### 1.3 The Viewpoint Redundancy Problem
 
 **Definition (informal)**: Viewpoint Redundancy occurs when the top-k retrieved documents are semantically similar (high cosine similarity) but cover the same conceptual perspective, missing equally relevant documents from different viewpoints.
 
@@ -51,7 +67,7 @@ Viewpoint Redundancy is endemic to **knowledge-intensive domains** where:
 
 Business consulting, legal analysis, medical decision support, and organizational knowledge management all exhibit this structure.
 
-### 1.3 Our Contribution
+### 1.4 Our Contribution
 
 We make three contributions:
 
