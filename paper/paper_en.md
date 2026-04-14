@@ -159,6 +159,35 @@ where relevance is computed directly from embedding vectors (not from the rounde
 
 **λ parameter**: We use `λ = 0.7` (relevance-biased) as the default. Higher λ approaches pure relevance ordering; lower λ forces more diversity. For consulting queries, λ = 0.7 empirically balances retrieving relevant documents while preserving viewpoint coverage.
 
+### 3.4 Adaptive Pipeline Selection
+
+Static application of MMR-First (Section 3.3) improves average diversity but can degrade results on queries where the candidate pool is already naturally diverse — a reversal observed for low-abstraction technical queries. This motivates a query-time pipeline selection rule.
+
+**Key observation**: The VR score of the candidate pool (top-k documents returned by dense retrieval) varies systematically by query type. Abstract queries attract a dense, perspective-homogeneous cluster (high candidate VR); specific technical queries attract a sparser, already-diverse set (lower candidate VR).
+
+**Decision rule**: Given a candidate pool `H = {h_1, ..., h_K}` from dense retrieval and a pre-computed corpus reference VR `μ_corpus`:
+
+```
+candidate_vr = VR(H)            # avg pairwise cosine similarity of H
+
+if candidate_vr > θ:            # candidate pool is denser than corpus baseline
+    apply MMR-First             # diversity intervention needed
+else:
+    apply Rerank-First          # candidate pool already diverse; quality-first
+```
+
+**Threshold `θ`**: We set `θ = μ_corpus × (1 + α)` where `α` controls sensitivity. Setting `α = 0.025` (equivalently, `n = 1.5` in the implementation) places `θ` approximately at the median candidate VR observed across a representative query set, yielding a roughly 40/60 MMR-First/Rerank-First split.
+
+**Pre-computation**: `μ_corpus` is computed offline by drawing random samples of size `k` from the full corpus embedding set and averaging their VR scores over 30 trials. This takes seconds and is stable across corpus sizes (standard deviation < 0.006 at k=20 over 374 documents).
+
+This results in three pipeline variants evaluated in Section 5.5:
+
+| Variant | Selection rule | Description |
+|---------|---------------|-------------|
+| MMR-First (static) | Always | Diversity-first regardless of query |
+| Rerank-First (static) | Never | Quality-first regardless of query |
+| **Adaptive** | `candidate_vr > θ` | Selects per query |
+
 ---
 
 ## 4. Experimental Setup
@@ -270,6 +299,47 @@ This provides a practical criterion: apply Diversity-First RAG when query abstra
 
 **Finding**: The MMR stage adds 1.7ms regardless of warm/cold state. In production (warm models), the proposed pipeline adds **essentially zero overhead**. The cold-start difference is entirely due to reranker model loading, which occurs in both pipelines.
 
+### 5.5 Adaptive Pipeline Evaluation
+
+To evaluate the Adaptive Pipeline Selection described in Section 3.4, we ran an extended experiment on a larger corpus (374 documents, same collection) with 20 queries spanning four abstraction levels.
+
+**Extended corpus**:
+
+| Property | Value |
+|----------|-------|
+| Total documents | 374 |
+| Query set | 20 queries (high: 5, medium: 7, low: 5, cross-domain: 3) |
+| Corpus reference VR (k=20, 30 trials) | 0.8742 ± 0.0054 |
+| Adaptive threshold θ (n=1.5) | 0.8960 |
+
+**Three-pipeline comparison** (final_VR, lower = more diverse):
+
+| Pipeline | Avg final VR | vs. best static |
+|----------|-------------|-----------------|
+| MMR-First (static) | 0.8952 | — |
+| Rerank-First (static) | 0.8958 | — |
+| **Adaptive (n=1.5)** | **0.8942** | **−0.0010 better** |
+
+**Pipeline selection distribution** (n=20 queries):
+
+| Selected | Count | % |
+|----------|-------|---|
+| MMR-First | 8 | 40% |
+| Rerank-First | 12 | 60% |
+
+**By abstraction level**:
+
+| Level | Adaptive avg VR | vs. best static | Win rate |
+|-------|----------------|-----------------|----------|
+| High abstraction | 0.8977 | −0.0005 ✅ | 3/5 |
+| Medium abstraction | 0.8913 | −0.0009 ✅ | 3/7 |
+| **Low abstraction** | **0.8928** | **−0.0001 ✅** | **3/5** |
+| Cross-domain | 0.8974 | −0.0018 ✅ | 3/3 |
+
+The key result is the low-abstraction row: static MMR-First degrades on specific technical queries (VR=0.8962, worse than Rerank-First at 0.8929), while Adaptive correctly selects Rerank-First for most low-abstraction queries, achieving 0.8928 — matching the best static choice. The reversal problem observed in the static evaluation (Section 5.3) is resolved.
+
+**Finding**: Adaptive Pipeline Selection achieves the best overall diversity across all abstraction levels, with a win rate of 60% against the better of the two static pipelines and no catastrophic degradation in any level. The θ threshold (≈ median candidate VR) provides a practical, corpus-calibrated decision boundary.
+
 ---
 
 ## 6. Discussion
@@ -309,23 +379,26 @@ For consulting queries, we observe that λ = 0.7 is sufficient to produce the or
 
 Based on these results, we recommend:
 
-1. **Use Diversity-First RAG** when: queries are abstract, domain is knowledge-intensive, multi-perspective answers are expected
-2. **Use standard pipeline** when: queries are specific/factual, single correct answer exists, latency is critical and warm-model performance is unacceptable
-3. **Default λ = 0.7** for consulting and similar domains; consider lower λ if diversity is paramount
-4. **Keep MMR pool size ≥ 10**: MMR needs enough candidates to find genuine diversity. A pool of 5 leaves little room for meaningful diversification.
+1. **Use Adaptive Pipeline Selection** (Section 3.4) as the default: compute candidate VR at query time and select MMR-First or Rerank-First accordingly. This outperforms either static choice across abstraction levels with negligible overhead (one VR computation over k=20 documents).
+2. **Use static MMR-First** when: query mix is known to be abstract-heavy, simplicity is preferred over per-query optimization.
+3. **Use standard pipeline** when: queries are specific/factual, single correct answer exists.
+4. **Calibrate θ offline**: compute `μ_corpus` by sampling the production corpus (30 trials, k=20, takes < 5 seconds). Set `θ = μ_corpus × 1.025` as a starting point; adjust based on query distribution.
+5. **Default λ = 0.7** for consulting and similar domains; consider lower λ if diversity is paramount.
+6. **Keep MMR pool size ≥ 10**: MMR needs enough candidates to find genuine diversity. A pool of 5 leaves little room for meaningful diversification.
 
 ---
 
 ## 7. Conclusion
 
-We presented **Diversity-First RAG**, a simple reordering of the standard RAG pipeline that places MMR before CrossEncoder reranking. Through experiments on a real business consulting knowledge base, we showed that this reordering:
+We presented **Diversity-First RAG**, a simple reordering of the standard RAG pipeline that places MMR before CrossEncoder reranking, and **Adaptive Pipeline Selection**, a query-time decision rule that applies this reordering only when the candidate pool exhibits Viewpoint Redundancy. Through experiments on a real business consulting knowledge base (40 documents, 5 queries; extended to 374 documents, 20 queries), we showed:
 
-- Changes 40% of retrieved documents on average across diverse queries
-- Produces zero document overlap on abstract, multi-faceted consulting queries
-- Adds only 1.7ms of latency in warm-model production settings
-- Has no effect on specific technical queries — providing a clear criterion for when to apply it
+- Pipeline order changes **40% of retrieved documents** on average across diverse queries
+- **0% document overlap** on abstract, multi-faceted consulting queries — the highest-stakes case
+- Only **1.7ms overhead** in warm-model production settings
+- Static MMR-First degrades on low-abstraction technical queries; Adaptive resolves this
+- Adaptive achieves the **best overall diversity** (avg VR 0.8942 vs. 0.8952 / 0.8958) across all abstraction levels with a 60% win rate against the better static choice
 
-The core insight is that **diversity discarded by the reranker cannot be recovered by post-hoc MMR**. By diversifying first, we ensure that the reranker selects the best representative from each relevant perspective, rather than the best N documents from a single perspective.
+The core insight is that **diversity discarded by the reranker cannot be recovered by post-hoc MMR**. By diversifying first — and doing so only when the candidate pool warrants it — we ensure that the reranker selects the best representative from each relevant perspective, rather than the best N documents from a single perspective.
 
 The Viewpoint Redundancy problem is likely widespread in knowledge-intensive RAG deployments. We hope this work encourages practitioners to examine the ordering assumptions in their own pipelines.
 
